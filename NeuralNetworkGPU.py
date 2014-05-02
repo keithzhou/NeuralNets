@@ -19,7 +19,7 @@ def gradient_output_softmax(y_predicted,y_target):
 def score_softmax(y_target,y_predicted):
     assert(type(y_target) == type(y_predicted))
     if type(y_target) is g.garray:
-        return g.sum(y_target * g.log(y_predicted + 1e-300))
+        return g.sum(y_target * g.log(y_predicted + 1e-30))
     else:
         return np.sum(y_target * np.log(y_predicted + 1e-300))
 
@@ -63,14 +63,13 @@ class NeuralNetworkGPU():
         activity = []
         result = X
         for i in range(len(self.weights)):
+            p = self.dropout_probability[i]
+            mask = (g.rand(result.shape) >= p)
+            result = result * mask
             activity.append(result)
             w,b = self.weights[i]
-            p = self.dropout_probability[i]
             result = g.dot(result,w) + b
             result = self.activation[i](result)
-            if i != len(self.weights) - 1:
-              mask = (g.rand(result.shape) >= p)
-              result = result * mask
             
         # backward
         gradientNodes = []
@@ -122,9 +121,8 @@ class NeuralNetworkGPU():
                         b += gb*lr
 
                         l2 = g.sum(w*w,axis=0)
-                        for i in range(len(l2.shape)):
-                            if l2[i] > self.l2_max:
-                                w[:,i] /= (l2[i] / self.l2_max)
+                        l2 = (l2 >= self.l2_max) * (l2 * self.l2_max) + (l2 < self.l2_max) 
+                        w /= l2
             mismatch = ''
             if X_validation is not None:
                 mismatch = self.predict(X_validation) 
