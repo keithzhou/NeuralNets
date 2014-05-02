@@ -37,6 +37,9 @@ class NeuralNetworkGPU():
         self.mini_batch_size = 100
         self.doGradientCheck = doGradientCheck
         self.l2_max = l2_max
+
+        self.training_score = []
+        self.training_validation_error = []
         
         self.weights = []
         self.activation = []
@@ -121,14 +124,16 @@ class NeuralNetworkGPU():
                         b += gb*lr
 
                         l2 = g.sum(w*w,axis=0)
-                        l2 = (l2 >= self.l2_max) * (l2 * self.l2_max) + (l2 < self.l2_max) 
+                        l2 = (l2 >= self.l2_max) * (l2 / self.l2_max) + (l2 < self.l2_max) 
                         w /= l2
             mismatch = ''
             if X_validation is not None:
                 mismatch = self.predict(X_validation) 
                 mismatch = np.sum(mismatch != y_validation)
+                self.training_validation_error.append(mismatch)
                 mismatch = "error:%d/%d" % (mismatch,len(y_validation))
                 
+            self.training_score.append(score)
             print "epoch:", epoch, "score", score,  "lr:", lr, "momentum:", p, "time:", time.clock() - timeStart, mismatch
     
     def predict(self,X):
