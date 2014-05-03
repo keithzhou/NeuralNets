@@ -69,6 +69,7 @@ class NeuralNetworkGPU():
             p = self.dropout_probability[i]
             mask = (g.rand(result.shape) >= p)
             result = result * mask
+            del mask
             activity.append(result)
             w,b = self.weights[i]
             result = g.dot(result,w) + b
@@ -91,11 +92,13 @@ class NeuralNetworkGPU():
             gradB = (g.sum(gradientNodes[-(i+1)],axis=0) / len(X))
             assert(gradB.shape == self.weights[i][1].shape)
             resultGradient.append([gradW,gradB])
+
+        del gradientNodes
         
         return resultGradient
     
-    def fit(self,X,y, X_validation = None, y_validation = None):
-        batchIndices = [(k, k+self.mini_batch_size) for k in range(0,len(X),self.mini_batch_size)]
+    def fit(self,XTrain,yTrain, X_validation = None, y_validation = None):
+        batchIndices = [(k, k+self.mini_batch_size) for k in range(0,len(XTrain),self.mini_batch_size)]
         if X_validation is not None:
             X_validation = g.garray(X_validation)
         momentum = []
@@ -103,9 +106,9 @@ class NeuralNetworkGPU():
             momentum.append([None,None])
         for epoch in range(self.n_epochs):
             timeStart = time.clock()
-            random_indices = np.random.permutation(len(X))
-            X = X[random_indices]
-            y = y[random_indices]
+            random_indices = np.random.permutation(len(XTrain))
+            X = XTrain[random_indices]
+            y = yTrain[random_indices]
             score = 0.0
             p = np.min([epoch/500.0,500]) * (.99-.5) + .5
             lr = self.learning_rate(epoch)
@@ -126,6 +129,8 @@ class NeuralNetworkGPU():
                         l2 = g.sum(w*w,axis=0)
                         l2 = (l2 >= self.l2_max) * (l2 / self.l2_max) + (l2 < self.l2_max) 
                         w /= l2
+                    del gx,gy,gradient
+            del X,y,random_indices
             mismatch = ''
             if X_validation is not None:
                 mismatch = self.predict(X_validation) 
